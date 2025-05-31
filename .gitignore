@@ -16,3 +16,4 @@ cache/
 output/model_trace/random_forest_model.pkl
 # Ignore Jupyter Notebook checkpoints
 .ipynb_checkpoints/
+output/cost_surfaces/*.tif
