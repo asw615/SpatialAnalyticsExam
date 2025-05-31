@@ -1,0 +1,18 @@
+# Ignore Python virtual environments
+.venv/
+venv/
+
+# Ignore environment variable files
+.env
+
+# Ignore data and output files
+data/
+# ignore cache files
+cache/
+# Ignore OS and editor files
+.DS_Store
+*.swp
+*.swo
+
+# Ignore Jupyter Notebook checkpoints
+.ipynb_checkpoints/

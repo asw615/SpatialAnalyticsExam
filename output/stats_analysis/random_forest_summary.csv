@@ -1,0 +1,2 @@
+model_type,n_predictors,n_observations,n_tracks,n_estimators,max_depth,cv_r2_mean,cv_r2_std,cv_rmse_mean,oob_score_final,oob_score_mean_cv,test_r2,test_rmse,test_mae,cv_time_seconds,total_time_seconds,cores_used
+random_forest,14,112285,68,300,20,0.38004245130501707,0.009156052217664842,3.3198872138674553,0.4525667407543601,0.3882184905277694,0.42385708365517394,3.1584339673821598,2.2289275745209354,10.3468759059906,540.8968431949615,8
