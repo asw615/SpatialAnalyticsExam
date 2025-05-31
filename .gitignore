@@ -5,8 +5,8 @@ venv/
 # Ignore environment variable files
 .env
 
-# Ignore data and output files
-data/
+# Ignore data and output files (but not src/data/)
+/data/
 # ignore cache files
 cache/
 # Ignore OS and editor files
