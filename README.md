@@ -82,7 +82,6 @@ SpatialAnalyticsExam/
 1. **GPS Track Data** (`data/raw/gps/`):
    - Download GPX files from [Livelox O-Ringen](https://www.livelox.com/Viewer/O-Ringen-Smalandskusten-etapp-4-medel/H21-Elit?classId=805532&tab=player)
    - Place all `.gpx` files directly in `data/raw/gps/`
-   - Files should be named with athlete IDs (e.g., `123456.gpx`)
 
 2. **Orienteering Map** (`data/raw/map/oringen_kmz/`):
    - Download the race map KMZ file from the Livelox event page
