@@ -17,7 +17,7 @@ The project integrates multiple high-quality geospatial datasets to create a com
 | **D1: Digital Elevation Model** | Bare-earth elevation data generated from LiDAR | [Lantmäteriet](https://www.lantmateriet.se/sv/geodata/vara-produkter/produktlista/markhojdmodell-nedladdning) | 1×1 m | CC0 |
 | **D2: Topography Model** | Vector features including land cover, roads, trails, gates, and elevation contours | [Lantmäteriet](https://www.lantmateriet.se/sv/geodata/vara-produkter/produktlista/topografi-50-nedladdning-vektor/) | 1:15,000–1:50,000 | CC0 |
 | **D3: NDVI** | Normalized Difference Vegetation Index for vegetation analysis | [Copernicus Land Monitoring Service](https://land.copernicus.eu/en/products/vegetation/high-resolution-normalised-difference-vegetation-index) | 10×10 m | Free use |
-| **D4: GPS Race Data** | Orienteering race map and GPS tracks from H21 Elite athletes | [Livelox O-Ringen](https://www.livelox.com/Viewer/O-Ringen-Smalandskusten-etapp-4-medel/H21-Elit?classId=805532&tab=player) | GPX tracks | Rights reserved* |
+| **D4: GPS Race Data** | Orienteering race map and GPS tracks from H21 Elite athletes | [Livelox O-Ringen](https://www.livelox.com/Viewer/O-Ringen-Smalandskusten-etapp-4-medel/H21-Elit?classId=805532&tab=player) | GPX tracks and 1:10,000 | Rights reserved* |
 
 *Note: The orienteering race data license doesn't permit redistribution, though map data can be downloaded as KMZ and GPS coordinates are publicly available for download. The repository structure shows where to place this data locally.
 
