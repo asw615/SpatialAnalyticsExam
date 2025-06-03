@@ -6,10 +6,16 @@ venv/
 .env
 
 # Ignore data and output files (but not src/data/)
-data/raw/map/
-data/raw/gps/
-data/derived/map/
-data/derived/gps/
+data/raw/map/*
+!data/raw/map/control_points/
+!data/raw/map/GCP_points_for_setting_georeference.points
+data/raw/gps/*
+!data/raw/gps/.gitkeep
+data/derived/map/*
+!data/derived/map/control_points_race_3006.shp
+!data/derived/map/impassible_areas.shp
+data/derived/gps/*
+!data/derived/gps/.gitkeep
 # ignore cache files
 cache/
 # Ignore OS and editor files
