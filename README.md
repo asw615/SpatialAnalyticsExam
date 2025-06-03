@@ -19,7 +19,7 @@ The project integrates multiple high-quality geospatial datasets to create a com
 | **D3: NDVI** | Normalized Difference Vegetation Index for vegetation analysis | [Copernicus Land Monitoring Service](https://land.copernicus.eu/en/products/vegetation/high-resolution-normalised-difference-vegetation-index) | 10×10 m | Free use |
 | **D4: GPS Race Data** | Orienteering race map and GPS tracks from H21 Elite athletes | [Livelox O-Ringen](https://www.livelox.com/Viewer/O-Ringen-Smalandskusten-etapp-4-medel/H21-Elit?classId=805532&tab=player) | GPX tracks | Rights reserved* |
 
-*Note: The orienteering race data license doesn't permit redistribution, though map data can be downloaded as KMZ and GPS coordinates are publicly viewable. The repository structure shows where to place this data locally.
+*Note: The orienteering race data license doesn't permit redistribution, though map data can be downloaded as KMZ and GPS coordinates are publicly available for download. The repository structure shows where to place this data locally.
 
 ## Project Structure
 
@@ -38,14 +38,59 @@ SpatialAnalyticsExam/
 │   ├── optimization/
 │   │   └── least_cost_paths.py          # Generate optimal routes
 │   ├── visualizations/
-│   │   └── random_forest_simplified.py  # Create analysis visualizations
+│   │   ├── random_forest_simplified.py  # Create analysis visualizations
+│   │   └── viz_config.py                # Visualization configuration
 │   ├── scripts/
 │   │   └── convert_oringen_map.sh       # Convert KMZ to GeoTIFF
 │   └── main_workflow.py                 # Orchestrate complete pipeline
-├── data/                                # Raw and processed data files
-├── output/                              # Generated results and visualizations
-└── requirements.txt                     # Python dependencies
+├── data/
+│   ├── raw/                             # Original source data
+│   │   ├── gps/                         # GPS track files (user-provided)
+│   │   │   └── [place GPX files here]   # Download from Livelox
+│   │   ├── map/                         # Orienteering map data (user-provided)
+│   │   │   ├── oringen_kmz/             # Place KMZ file here
+│   │   │   └── control_points/          # Generated control point data
+│   │   ├── lantmateriet/                # Swedish topographic data (included)
+│   │   ├── ndvi/                        # Vegetation index data (included)
+│   │   └── dem/                         # Digital elevation model (included)
+│   └── derived/                         # Processed data outputs
+│       ├── gps/                         # Cleaned GPS tracks with speed data
+│       ├── map/                         # Georeferenced map files
+│       ├── lantmateriet/                # Processed topographic features
+│       ├── ndvi/                        # Reprojected vegetation data
+│       ├── dem/                         # Processed elevation data
+│       ├── rasters/                     # Environmental feature rasters
+│       └── csv/                         # Tabular analysis data
+├── output/
+│   ├── cost_surfaces/                   # Generated cost surface rasters
+│   ├── figures/                         # Analysis visualizations
+│   ├── model_trace/                     # Saved model artifacts
+│   └── spatial_analysis/               # Spatial analysis results
+├── cache/                               # Workflow caching
+├── venv/                                # Python virtual environment
+├── requirements.txt                     # Python dependencies
+├── setup.sh                            # Environment setup script
+└── .gitattributes                      # Git LFS configuration
 ```
+
+### Data Licensing and Placement Instructions
+
+**⚠️ Important:** Due to licensing restrictions, GPS track data and orienteering maps are not included in this repository. Users must download and place these files manually:
+
+#### Required User Downloads:
+
+1. **GPS Track Data** (`data/raw/gps/`):
+   - Download GPX files from [Livelox O-Ringen](https://www.livelox.com/Viewer/O-Ringen-Smalandskusten-etapp-4-medel/H21-Elit?classId=805532&tab=player)
+   - Place all `.gpx` files directly in `data/raw/gps/`
+   - Files should be named with athlete IDs (e.g., `123456.gpx`)
+
+2. **Orienteering Map** (`data/raw/map/oringen_kmz/`):
+   - Download the race map KMZ file from the Livelox event page
+   - Place the `.kmz` file in `data/raw/map/`
+   - The script `src/data/convert_oringen_map.sh` will extract and georeference the map automatically.
+   - The map is not correctly georeferenced. A suggested way of doing this is to use QGIS, use the points from the file `data/raw/map/GCP_points_for_setting_georeference.points` and use the Helbert method to georeference. Save the referenced map as `data/raw/map/oringen_e4_2024_h21elit_REFERENCED.tif`
+   - Once done, the analysis should be able to run.
+
 
 ## Instructions/Getting Started
 
@@ -54,23 +99,18 @@ SpatialAnalyticsExam/
 - GDAL/OGR libraries
 - Required Python packages (see requirements.txt)
 
-### Installation
-1. Clone the repository
+### Installation and Setup
+
+1. **Clone the repository**
 ```bash
-git clone [repository-url]
+git clone https://github.com/asw615/SpatialAnalyticsExam.git
 cd SpatialAnalyticsExam
 ```
 
-2. Install dependencies, create venv and activate it
+2. **Install dependencies and create virtual environment**
 ```bash
 bash setup.sh
 ```
-
-3. Download required data:
-   - Place O-Ringen KMZ data in `data/raw/map/`. The O-ringen map requires manual georeferencing, which can be done using QGIS. 
-   - Place GPS files in `data/raw/gps/`
-   - DEM, topographic and NDVI data is included in the github repo and will downloaded automatically
-
 
 ### Running the Analysis
 Execute the complete pipeline:
