@@ -13,7 +13,15 @@ data/raw/gps/*
 !data/raw/gps/.gitkeep
 data/derived/map/*
 !data/derived/map/control_points_race_3006.shp
+!data/derived/map/control_points_race_3006.shx
+!data/derived/map/control_points_race_3006.dbf
+!data/derived/map/control_points_race_3006.prj
+!data/derived/map/control_points_race_3006.cpg
 !data/derived/map/impassible_areas.shp
+!data/derived/map/impassible_areas.shx
+!data/derived/map/impassible_areas.dbf
+!data/derived/map/impassible_areas.prj
+!data/derived/map/impassible_areas.cpg
 data/derived/gps/*
 !data/derived/gps/.gitkeep
 # ignore cache files
