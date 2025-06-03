@@ -113,14 +113,10 @@ bash setup.sh
 ```
 
 ### Running the Analysis
-Execute the complete pipeline:
-```bash
-python src/main_workflow.py
-```
+After having cloned the GitHub Repository, downloaded GPS data, georeferenced the map, the full pipeline can be run by skipping the first two download and convert steps:
 
-Or run individual components with skip flags:
 ```bash
-python src/main_workflow.py --skip-dem --skip-features
+python src/main_workflow.py --skip-dem --skip-map
 ```
 
 ## Procedure/Methods
