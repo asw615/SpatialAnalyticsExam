@@ -87,9 +87,9 @@ SpatialAnalyticsExam/
 2. **Orienteering Map** (`data/raw/map/oringen_kmz/`):
    - Download the race map KMZ file from the Livelox event page
    - Place the `.kmz` file in `data/raw/map/`
-   - The script `src/data/convert_oringen_map.sh` will extract the files and attempt to georeference the map, but after this step, the map is not aligning correcty.
-   - A suggested way of aligning the map correcty is to use QGIS. Use the points from the file `data/raw/map/GCP_points_for_setting_georeference.points` and use the Helbert method to georeference. Save the referenced map as `data/raw/map/oringen_e4_2024_h21elit_REFERENCED.tif`
-   - Once done, the analysis should be able to run.
+   - The script `src/data/convert_oringen_map.sh` will extract the files and georeference the map
+
+* Note - Originally Helmert was used, but for reproducability, this method is using a Thin plate spline transformation. This step had to be done to automate the process without manually georeferencing in QGIS.
 
 
 ## Instructions/Getting Started
