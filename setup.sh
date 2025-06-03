@@ -6,6 +6,8 @@ python3 -m venv venv
 # Activate the virtual environment
 source venv/bin/activate
 
+pip install --upgrade pip
+
 # Install requirements if requirements.txt exists
 if [ -f requirements.txt ]; then
     pip install -r requirements.txt
