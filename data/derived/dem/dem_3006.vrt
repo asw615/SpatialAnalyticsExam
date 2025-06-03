@@ -1,0 +1,112 @@
+<VRTDataset rasterXSize="10000" rasterYSize="7500">
+  <SRS dataAxisToSRSAxisMapping="2,1">PROJCS["SWEREF99 TM",GEOGCS["SWEREF99",DATUM["SWEREF99",SPHEROID["GRS 1980",6378137,298.257222101,AUTHORITY["EPSG","7019"]],AUTHORITY["EPSG","6619"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4619"]],PROJECTION["Transverse_Mercator"],PARAMETER["latitude_of_origin",0],PARAMETER["central_meridian",15],PARAMETER["scale_factor",0.9996],PARAMETER["false_easting",500000],PARAMETER["false_northing",0],UNIT["metre",1,AUTHORITY["EPSG","9001"]],AXIS["Northing",NORTH],AXIS["Easting",EAST],AUTHORITY["EPSG","3006"]]</SRS>
+  <GeoTransform>  5.8250000000000000e+05,  1.0000000000000000e+00,  0.0000000000000000e+00,  6.3525000000000000e+06,  0.0000000000000000e+00, -1.0000000000000000e+00</GeoTransform>
+  <VRTRasterBand dataType="Float32" band="1">
+    <Metadata>
+      <MDI key="STATISTICS_APPROXIMATE">YES</MDI>
+      <MDI key="STATISTICS_MAXIMUM">58.369998931885</MDI>
+      <MDI key="STATISTICS_MEAN">18.398612149287</MDI>
+      <MDI key="STATISTICS_MINIMUM">0.070000000298023</MDI>
+      <MDI key="STATISTICS_STDDEV">16.949126743246</MDI>
+      <MDI key="STATISTICS_VALID_PERCENT">86.16</MDI>
+    </Metadata>
+    <NoDataValue>-9999</NoDataValue>
+    <ColorInterp>Gray</ColorInterp>
+    <ComplexSource>
+      <SourceFilename relativeToVRT="1">63475_5875_25_3006.tif</SourceFilename>
+      <SourceBand>1</SourceBand>
+      <SourceProperties RasterXSize="2021" RasterYSize="2080" DataType="Float32" BlockXSize="2021" BlockYSize="1" />
+      <SrcRect xOff="0" yOff="0" xSize="2021" ySize="2080" />
+      <DstRect xOff="5000" yOff="2500" xSize="2021" ySize="2080" />
+      <NODATA>-9999</NODATA>
+    </ComplexSource>
+    <ComplexSource>
+      <SourceFilename relativeToVRT="1">63500_5900_25_3006.tif</SourceFilename>
+      <SourceBand>1</SourceBand>
+      <SourceProperties RasterXSize="2500" RasterYSize="2500" DataType="Float32" BlockXSize="2500" BlockYSize="1" />
+      <SrcRect xOff="0" yOff="0" xSize="2500" ySize="2500" />
+      <DstRect xOff="7500" yOff="0" xSize="2500" ySize="2500" />
+      <NODATA>-9999</NODATA>
+    </ComplexSource>
+    <ComplexSource>
+      <SourceFilename relativeToVRT="1">63500_5850_25_3006.tif</SourceFilename>
+      <SourceBand>1</SourceBand>
+      <SourceProperties RasterXSize="2262" RasterYSize="1160" DataType="Float32" BlockXSize="2262" BlockYSize="1" />
+      <SrcRect xOff="0" yOff="0" xSize="2262" ySize="1160" />
+      <DstRect xOff="2738" yOff="1340" xSize="2262" ySize="1160" />
+      <NODATA>-9999</NODATA>
+    </ComplexSource>
+    <ComplexSource>
+      <SourceFilename relativeToVRT="1">63500_5825_25_3006.tif</SourceFilename>
+      <SourceBand>1</SourceBand>
+      <SourceProperties RasterXSize="2500" RasterYSize="2500" DataType="Float32" BlockXSize="2500" BlockYSize="1" />
+      <SrcRect xOff="0" yOff="0" xSize="2500" ySize="2500" />
+      <DstRect xOff="0" yOff="0" xSize="2500" ySize="2500" />
+      <NODATA>-9999</NODATA>
+    </ComplexSource>
+    <ComplexSource>
+      <SourceFilename relativeToVRT="1">63450_5875_25_3006.tif</SourceFilename>
+      <SourceBand>1</SourceBand>
+      <SourceProperties RasterXSize="2500" RasterYSize="2500" DataType="Float32" BlockXSize="2500" BlockYSize="1" />
+      <SrcRect xOff="0" yOff="0" xSize="2500" ySize="2500" />
+      <DstRect xOff="5000" yOff="5000" xSize="2500" ySize="2500" />
+      <NODATA>-9999</NODATA>
+    </ComplexSource>
+    <ComplexSource>
+      <SourceFilename relativeToVRT="1">63500_5875_25_3006.tif</SourceFilename>
+      <SourceBand>1</SourceBand>
+      <SourceProperties RasterXSize="2021" RasterYSize="1160" DataType="Float32" BlockXSize="2021" BlockYSize="1" />
+      <SrcRect xOff="0" yOff="0" xSize="2021" ySize="1160" />
+      <DstRect xOff="5000" yOff="1340" xSize="2021" ySize="1160" />
+      <NODATA>-9999</NODATA>
+    </ComplexSource>
+    <ComplexSource>
+      <SourceFilename relativeToVRT="1">63475_5850_25_3006.tif</SourceFilename>
+      <SourceBand>1</SourceBand>
+      <SourceProperties RasterXSize="2262" RasterYSize="2080" DataType="Float32" BlockXSize="2262" BlockYSize="1" />
+      <SrcRect xOff="0" yOff="0" xSize="2262" ySize="2080" />
+      <DstRect xOff="2738" yOff="2500" xSize="2262" ySize="2080" />
+      <NODATA>-9999</NODATA>
+    </ComplexSource>
+    <ComplexSource>
+      <SourceFilename relativeToVRT="1">63450_5825_25_3006.tif</SourceFilename>
+      <SourceBand>1</SourceBand>
+      <SourceProperties RasterXSize="2500" RasterYSize="2500" DataType="Float32" BlockXSize="2500" BlockYSize="1" />
+      <SrcRect xOff="0" yOff="0" xSize="2500" ySize="2500" />
+      <DstRect xOff="0" yOff="5000" xSize="2500" ySize="2500" />
+      <NODATA>-9999</NODATA>
+    </ComplexSource>
+    <ComplexSource>
+      <SourceFilename relativeToVRT="1">63475_5900_25_3006.tif</SourceFilename>
+      <SourceBand>1</SourceBand>
+      <SourceProperties RasterXSize="2500" RasterYSize="2500" DataType="Float32" BlockXSize="2500" BlockYSize="1" />
+      <SrcRect xOff="0" yOff="0" xSize="2500" ySize="2500" />
+      <DstRect xOff="7500" yOff="2500" xSize="2500" ySize="2500" />
+      <NODATA>-9999</NODATA>
+    </ComplexSource>
+    <ComplexSource>
+      <SourceFilename relativeToVRT="1">63450_5850_25_3006.tif</SourceFilename>
+      <SourceBand>1</SourceBand>
+      <SourceProperties RasterXSize="2500" RasterYSize="2500" DataType="Float32" BlockXSize="2500" BlockYSize="1" />
+      <SrcRect xOff="0" yOff="0" xSize="2500" ySize="2500" />
+      <DstRect xOff="2500" yOff="5000" xSize="2500" ySize="2500" />
+      <NODATA>-9999</NODATA>
+    </ComplexSource>
+    <ComplexSource>
+      <SourceFilename relativeToVRT="1">63475_5825_25_3006.tif</SourceFilename>
+      <SourceBand>1</SourceBand>
+      <SourceProperties RasterXSize="2500" RasterYSize="2500" DataType="Float32" BlockXSize="2500" BlockYSize="1" />
+      <SrcRect xOff="0" yOff="0" xSize="2500" ySize="2500" />
+      <DstRect xOff="0" yOff="2500" xSize="2500" ySize="2500" />
+      <NODATA>-9999</NODATA>
+    </ComplexSource>
+    <ComplexSource>
+      <SourceFilename relativeToVRT="1">63450_5900_25_3006.tif</SourceFilename>
+      <SourceBand>1</SourceBand>
+      <SourceProperties RasterXSize="2500" RasterYSize="2500" DataType="Float32" BlockXSize="2500" BlockYSize="1" />
+      <SrcRect xOff="0" yOff="0" xSize="2500" ySize="2500" />
+      <DstRect xOff="7500" yOff="5000" xSize="2500" ySize="2500" />
+      <NODATA>-9999</NODATA>
+    </ComplexSource>
+  </VRTRasterBand>
+</VRTDataset>

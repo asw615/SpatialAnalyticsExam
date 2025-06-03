@@ -17,9 +17,6 @@ STAC_ROOT = "https://api.lantmateriet.se/stac-hojd/v1"
 
 OUT_DIR = Path("data/raw/dem")
 VRT_FILE = Path("data/raw/dem/mosaic.vrt")
-DEM_5M = Path("data/derived/dem_5m.tif")
-SLOPE = Path("data/derived/slope.tif")
-ASPECT = Path("data/derived/aspect.tif")
 
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 Path("data/derived").mkdir(parents=True, exist_ok=True)
@@ -67,25 +64,13 @@ for href in tqdm(tile_hrefs, desc="Downloading tiles"):
             f.write(chunk)
 
 
-# === BUILD VRT & PROCESS ===
+# === BUILD VRT ===
 tif_files = list(OUT_DIR.glob("*.tif"))
 if tif_files:
     print(f"\n📦 Building VRT from {len(tif_files)} tiles...")
     run(["gdalbuildvrt", str(VRT_FILE)] + [str(f) for f in tif_files], check=True)
-
-    print("🌍 Warping to 5m DEM grid...")
-    run([
-        "gdalwarp", "-overwrite", "-tr", "5", "5", "-tap", "-r", "average",
-        "-t_srs", "EPSG:3006", str(VRT_FILE), str(DEM_5M)
-    ], check=True)
-
-    print("📈 Generating slope and aspect...")
-    run(["gdaldem", "slope", str(DEM_5M), str(SLOPE)], check=True)
-    run(["gdaldem", "aspect", str(DEM_5M), str(ASPECT)], check=True)
-
-    print("\n✅ All done!")
-    print(f"DEM:      {DEM_5M}")
-    print(f"Slope:    {SLOPE}")
-    print(f"Aspect:   {ASPECT}")
+    
+    print("\n✅ DEM download and VRT creation complete!")
+    print(f"VRT file: {VRT_FILE}")
 else:
-    print("❌ No .tif files found, skipping processing.")
+    print("❌ No .tif files found, skipping VRT creation.")

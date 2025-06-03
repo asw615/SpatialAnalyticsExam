@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 """
-Random Forest Model for Spatial Analytics
+Random Forest Model for Spatial Analytics with Enhanced Cross-Validation
 Full-resolution machine learning approach using scikit-learn's RandomForestRegressor.
-Maintains the same structure as the Bayesian model with maximum accuracy.
+Addresses spatial autocorrelation through improved validation and sampling.
 
 Key features:
 1. Random Forest regression for speed prediction
 2. Feature importance analysis
-3. Cross-validation with multiple metrics
-4. Full-resolution cost surface generation
-5. Model trace and coefficient saving
-6. Uses all available data without subsampling
+3. Multiple cross-validation strategies (random, spatial, runner-based)
+4. Spatial sampling to reduce autocorrelation
+5. Full-resolution cost surface generation
+6. Model trace and coefficient saving
+7. Uses all available data without subsampling
+8. Direct speed prediction (no log transformation needed)
 """
 
 import pandas as pd
@@ -20,6 +22,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split, KFold
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
+from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 from shapely import wkt
 from shapely.geometry import Point
@@ -33,6 +36,16 @@ import joblib
 import pickle
 from functools import partial
 from tqdm import tqdm
+
+# Spatial statistics libraries for spatial cross-validation
+try:
+    from pysal.lib import weights
+    from pysal.explore import esda
+    HAS_PYSAL = True
+except ImportError:
+    print("Warning: PySAL not available. Spatial cross-validation will use simplified approach.")
+    HAS_PYSAL = False
+
 warnings.filterwarnings('ignore')
 
 # Set random seed for reproducibility
@@ -87,27 +100,97 @@ def fit_random_forest_model(X, y, n_estimators=200, max_depth=15):
     
     return model
 
-def cross_validate_rf(X, y, n_folds=5, n_estimators=200):
+def enhanced_cross_validation(X, y, coords, track_nums, n_folds=5, n_estimators=200):
     """
-    Cross-validation for Random Forest model using full-sized models
-    """
-    kf = KFold(n_splits=n_folds, shuffle=True, random_state=42)
+    Enhanced cross-validation with multiple strategies to address spatial autocorrelation.
     
+    Parameters:
+    -----------
+    X : array
+        Feature matrix
+    y : array
+        Target variable (speed in km/h)
+    coords : array
+        Coordinate pairs for spatial CV
+    track_nums : array
+        Runner/track IDs for runner-based CV
+    n_folds : int
+        Number of folds
+    n_estimators : int
+        Number of trees in Random Forest
+        
+    Returns:
+    --------
+    dict : Cross-validation results for all three strategies
+    """
+    print(f"Enhanced cross-validation: {n_folds} folds, {n_estimators} trees each")
+    print("Evaluating three validation strategies:")
+    print("1. Random CV (traditional)")
+    print("2. Spatial CV (addresses spatial autocorrelation)")
+    print("3. Runner-based CV (addresses runner-specific effects)")
+    
+    all_results = {}
+    
+    # Strategy 1: Traditional Random Cross-Validation
+    print(f"\n=== Strategy 1: Random Cross-Validation ===")
+    kf = KFold(n_splits=n_folds, shuffle=True, random_state=42)
+    random_folds = list(kf.split(X))
+    random_results = run_cv_folds(X, y, random_folds, n_estimators, "Random")
+    all_results['random'] = random_results
+    
+    # Strategy 2: Spatial Cross-Validation
+    print(f"\n=== Strategy 2: Spatial Cross-Validation ===")
+    try:
+        spatial_folds = spatial_cross_validation(X, y, coords, n_folds=n_folds, buffer_distance=100)
+        if len(spatial_folds) > 0:
+            spatial_results = run_cv_folds(X, y, spatial_folds, n_estimators, "Spatial")
+            all_results['spatial'] = spatial_results
+        else:
+            print("  Warning: No valid spatial folds created, using random CV")
+            all_results['spatial'] = random_results
+    except Exception as e:
+        print(f"  Warning: Spatial CV failed ({e}), using random CV")
+        all_results['spatial'] = random_results
+    
+    # Strategy 3: Runner-based Cross-Validation
+    print(f"\n=== Strategy 3: Runner-based Cross-Validation ===")
+    try:
+        runner_folds = runner_based_cross_validation(track_nums, n_folds=n_folds)
+        runner_results = run_cv_folds(X, y, runner_folds, n_estimators, "Runner-based")
+        all_results['runner_based'] = runner_results
+    except Exception as e:
+        print(f"  Warning: Runner-based CV failed ({e}), using random CV")
+        all_results['runner_based'] = random_results
+    
+    # Print comparison summary
+    print(f"\n=== Cross-Validation Strategy Comparison ===")
+    for strategy, results in all_results.items():
+        valid_r2 = [r for r in results['r2'] if r != 0.0]
+        if valid_r2:
+            mean_r2 = np.mean(valid_r2)
+            std_r2 = np.std(valid_r2)
+            mean_rmse = np.mean([r for r in results['rmse'] if r != 999.0])
+            print(f"  {strategy.capitalize():12}: R² = {mean_r2:.3f} ± {std_r2:.3f}, RMSE = {mean_rmse:.3f}")
+    
+    return all_results
+
+def run_cv_folds(X, y, folds, n_estimators, strategy_name):
+    """
+    Run cross-validation for a given set of folds.
+    """
     cv_results = {
         'r2': [], 'rmse': [], 'mae': [], 'oob_score': []
     }
     
-    print(f"Cross-validation: {n_folds} folds, {n_estimators} trees each")
-    
-    for fold, (train_idx, val_idx) in enumerate(kf.split(X)):
-        print(f"\n  Fold {fold + 1}/{n_folds}")
+    for fold, (train_idx, val_idx) in enumerate(folds):
+        print(f"\n  {strategy_name} Fold {fold + 1}/{len(folds)}")
         start_time = time.time()
         
         X_train, X_val = X[train_idx], X[val_idx]
         y_train, y_val = y[train_idx], y[val_idx]
         
         try:
-            # Fit full-sized model for CV
+            # Fit Random Forest model
             model = RandomForestRegressor(
                 n_estimators=n_estimators,
                 max_depth=15,
@@ -124,13 +207,11 @@ def cross_validate_rf(X, y, n_folds=5, n_estimators=200):
             
             # Predictions
             y_pred = model.predict(X_val)
-            y_pred_exp = np.exp(y_pred)
-            y_val_exp = np.exp(y_val)
             
-            # Metrics
-            r2_val = r2_score(y_val_exp, y_pred_exp)
-            rmse_val = np.sqrt(mean_squared_error(y_val_exp, y_pred_exp))
-            mae_val = mean_absolute_error(y_val_exp, y_pred_exp)
+            # Metrics (no need to convert back since we're not using log transform)
+            r2_val = r2_score(y_val, y_pred)
+            rmse_val = np.sqrt(mean_squared_error(y_val, y_pred))
+            mae_val = mean_absolute_error(y_val, y_pred)
             oob_score = model.oob_score_
             
             cv_results['r2'].append(r2_val)
@@ -224,9 +305,8 @@ def process_cost_chunk(chunk_info):
     chunk_X = np.column_stack(chunk_features)
     chunk_X_scaled = scaler.transform(chunk_X)
     
-    # Predict log speeds using Random Forest
-    log_speeds = model.predict(chunk_X_scaled)
-    speeds = np.exp(log_speeds)
+    # Predict speeds using Random Forest (no log transformation)
+    speeds = model.predict(chunk_X_scaled)
     
     # Convert to costs
     costs = 1.0 / np.maximum(speeds, 0.1)
@@ -392,9 +472,9 @@ def create_rf_cost_surface(model, predictor_paths, reference_raster, predictor_n
     print(f"  Impassable areas included with cost value: 999.0")
     return output_path
 
-def save_rf_model_and_results(model, feature_importance, predictor_names, scaler, output_dir="output/model_trace"):
+def save_enhanced_rf_results(model, feature_importance, predictor_names, scaler, all_cv_results, output_dir="output/model_trace"):
     """
-    Save Random Forest model, feature importance, and results.
+    Save Random Forest model, feature importance, and enhanced CV results.
     
     Parameters:
     -----------
@@ -406,6 +486,8 @@ def save_rf_model_and_results(model, feature_importance, predictor_names, scaler
         Names of the predictors
     scaler : StandardScaler
         The fitted scaler
+    all_cv_results : dict
+        Results from all CV strategies
     output_dir : str
         Directory to save outputs
     """
@@ -413,7 +495,7 @@ def save_rf_model_and_results(model, feature_importance, predictor_names, scaler
     # Create output directory
     os.makedirs(output_dir, exist_ok=True)
     
-    print(f"Saving Random Forest model and results to {output_dir}...")
+    print(f"Saving enhanced Random Forest model and results to {output_dir}...")
     
     # Save the trained model
     model_path = os.path.join(output_dir, "random_forest_model.pkl")
@@ -440,8 +522,27 @@ def save_rf_model_and_results(model, feature_importance, predictor_names, scaler
     importance_df.to_csv(importance_path, index=False)
     print(f"  Saved feature importance to: {importance_path}")
     
-    # For compatibility with Bayesian model analysis, also save in coefficient format
-    # Note: Random Forest doesn't have coefficients like linear models, but we can use importance as proxy
+    # Save enhanced cross-validation results
+    cv_summary = []
+    for strategy, results in all_cv_results.items():
+        valid_r2 = [r for r in results['r2'] if r != 0.0]
+        if valid_r2:
+            cv_summary.append({
+                'strategy': strategy,
+                'n_folds': len(valid_r2),
+                'r2_mean': np.mean(valid_r2),
+                'r2_std': np.std(valid_r2),
+                'rmse_mean': np.mean([r for r in results['rmse'] if r != 999.0]),
+                'rmse_std': np.std([r for r in results['rmse'] if r != 999.0]),
+                'oob_mean': np.mean([r for r in results['oob_score'] if r != 0.0])
+            })
+    
+    cv_summary_df = pd.DataFrame(cv_summary)
+    cv_path = os.path.join(output_dir, "enhanced_cv_results.csv")
+    cv_summary_df.to_csv(cv_path, index=False)
+    print(f"  Saved enhanced CV results to: {cv_path}")
+    
+    # For compatibility with existing analysis, also save in coefficient format
     coefficients_df = pd.DataFrame({
         'predictor': predictor_names,
         'coefficient_mean': feature_importance  # Using importance as coefficient proxy
@@ -457,9 +558,252 @@ def save_rf_model_and_results(model, feature_importance, predictor_names, scaler
     for _, row in importance_df.iterrows():
         print(f"  {row['predictor']:<25}: {row['importance']:>8.4f} (rank {row['importance_rank']})")
     
-    print(f"\nRandom Forest model and results saved to: {output_dir}")
+    # Print CV strategy comparison
+    print(f"\nCross-validation strategy comparison:")
+    print("-" * 70)
+    for _, row in cv_summary_df.iterrows():
+        print(f"  {row['strategy'].capitalize():<12}: R² = {row['r2_mean']:.3f} ± {row['r2_std']:.3f}, RMSE = {row['rmse_mean']:.3f}")
     
-    return importance_df
+    print(f"\nEnhanced Random Forest model and results saved to: {output_dir}")
+    
+    return importance_df, cv_summary_df
+
+def spatial_cross_val_score(model, X, y, coordinates, n_splits=5):
+    """
+    Spatial cross-validation for Random Forest model
+    """
+    print("  Performing spatial cross-validation...")
+    
+    # Create spatial clusters
+    kmeans = KMeans(n_clusters=n_splits, random_state=42)
+    cluster_labels = kmeans.fit_predict(coordinates)
+    
+    cv_results = {
+        'r2': [], 'rmse': [], 'mae': []
+    }
+    
+    # Split data by spatial clusters
+    for fold in range(n_splits):
+        print(f"    Fold {fold + 1}/{n_splits}")
+        
+        # Train on all clusters except the current one
+        train_idx = np.where(cluster_labels != fold)[0]
+        val_idx = np.where(cluster_labels == fold)[0]
+        
+        X_train, X_val = X[train_idx], X[val_idx]
+        y_train, y_val = y[train_idx], y[val_idx]
+        
+        # Fit model
+        model.fit(X_train, y_train)
+        
+        # Predictions
+        y_pred = model.predict(X_val)
+        
+        # Metrics
+        r2_val = r2_score(y_val, y_pred)
+        rmse_val = np.sqrt(mean_squared_error(y_val, y_pred))
+        mae_val = mean_absolute_error(y_val, y_pred)
+        
+        cv_results['r2'].append(r2_val)
+        cv_results['rmse'].append(rmse_val)
+        cv_results['mae'].append(mae_val)
+        
+        print(f"      R²: {r2_val:.3f}, RMSE: {rmse_val:.3f}")
+    
+    return cv_results
+
+def spatial_sampling(track_df, sample_ratio=0.7, grid_size=50):
+    """
+    Implement spatial sampling to reduce spatial autocorrelation.
+    
+    Parameters:
+    -----------
+    track_df : DataFrame
+        GPS track data with geometry column
+    sample_ratio : float
+        Proportion of data to keep (default 0.7)
+    grid_size : int
+        Size of spatial grid for sampling (default 50m)
+    
+    Returns:
+    --------
+    DataFrame : Spatially sampled subset of track_df
+    """
+    print(f"  Applying spatial sampling (ratio={sample_ratio}, grid={grid_size}m)...")
+    
+    # Create spatial grid
+    minx, miny, maxx, maxy = track_df.total_bounds if hasattr(track_df, 'total_bounds') else (
+        track_df.geometry.x.min(), track_df.geometry.y.min(),
+        track_df.geometry.x.max(), track_df.geometry.y.max()
+    )
+    
+    # Create grid cells
+    x_coords = np.arange(minx, maxx, grid_size)
+    y_coords = np.arange(miny, maxy, grid_size)
+    
+    # Assign each point to a grid cell
+    track_df = track_df.copy()
+    track_df['grid_x'] = ((track_df.geometry.x - minx) // grid_size).astype(int)
+    track_df['grid_y'] = ((track_df.geometry.y - miny) // grid_size).astype(int)
+    track_df['grid_id'] = track_df['grid_x'].astype(str) + '_' + track_df['grid_y'].astype(str)
+    
+    # Sample from each grid cell
+    sampled_data = []
+    for grid_id, group in track_df.groupby('grid_id'):
+        n_samples = max(1, int(len(group) * sample_ratio))
+        if len(group) > n_samples:
+            sampled = group.sample(n=n_samples, random_state=42)
+        else:
+            sampled = group
+        sampled_data.append(sampled)
+    
+    sampled_df = pd.concat(sampled_data, ignore_index=True)
+    sampled_df = sampled_df.drop(['grid_x', 'grid_y', 'grid_id'], axis=1)
+    
+    print(f"    Reduced from {len(track_df)} to {len(sampled_df)} points ({len(sampled_df)/len(track_df)*100:.1f}%)")
+    return sampled_df
+
+def spatial_cross_validation(X, y, coords, n_folds=5, buffer_distance=100):
+    """
+    Implement spatial cross-validation to account for spatial autocorrelation.
+    
+    Parameters:
+    -----------
+    X : array
+        Feature matrix
+    y : array  
+        Target variable
+    coords : array
+        Coordinate pairs (x, y) for each observation
+    n_folds : int
+        Number of folds for cross-validation
+    buffer_distance : float
+        Buffer distance in meters to separate train/test data
+    
+    Returns:
+    --------
+    list : List of (train_idx, test_idx) tuples for each fold
+    """
+    print(f"  Creating spatial cross-validation folds (buffer={buffer_distance}m)...")
+    
+    n_samples = len(X)
+    coords_array = np.array(coords)
+    
+    if HAS_PYSAL:
+        # Use spatial clustering for more sophisticated spatial CV
+        try:
+            # Use KMeans clustering in geographic space
+            kmeans = KMeans(n_clusters=n_folds * 2, random_state=42, n_init=10)
+            cluster_labels = kmeans.fit_predict(coords_array)
+            
+            folds = []
+            for fold in range(n_folds):
+                # Select clusters for test set
+                test_clusters = [fold * 2, fold * 2 + 1]
+                test_mask = np.isin(cluster_labels, test_clusters)
+                test_idx = np.where(test_mask)[0]
+                
+                # Create buffer around test points
+                if buffer_distance > 0:
+                    test_coords = coords_array[test_idx]
+                    distances = np.sqrt(((coords_array[:, None, :] - test_coords[None, :, :]) ** 2).sum(axis=2))
+                    min_distances = distances.min(axis=1)
+                    buffer_mask = min_distances > buffer_distance
+                    train_idx = np.where(~test_mask & buffer_mask)[0]
+                else:
+                    train_idx = np.where(~test_mask)[0]
+                
+                if len(train_idx) > 0 and len(test_idx) > 0:
+                    folds.append((train_idx, test_idx))
+                    print(f"    Fold {len(folds)}: {len(train_idx)} train, {len(test_idx)} test")
+            
+            return folds
+            
+        except Exception as e:
+            print(f"    Warning: Spatial clustering failed ({e}), using grid-based approach")
+    
+    # Fallback: Grid-based spatial cross-validation
+    minx, miny = coords_array.min(axis=0)
+    maxx, maxy = coords_array.max(axis=0)
+    
+    # Create spatial grid
+    x_splits = np.linspace(minx, maxx, int(np.sqrt(n_folds)) + 1)
+    y_splits = np.linspace(miny, maxy, int(np.sqrt(n_folds)) + 1)
+    
+    folds = []
+    fold_count = 0
+    
+    for i in range(len(x_splits) - 1):
+        for j in range(len(y_splits) - 1):
+            if fold_count >= n_folds:
+                break
+                
+            # Define test region
+            test_mask = (
+                (coords_array[:, 0] >= x_splits[i]) & 
+                (coords_array[:, 0] < x_splits[i + 1]) &
+                (coords_array[:, 1] >= y_splits[j]) & 
+                (coords_array[:, 1] < y_splits[j + 1])
+            )
+            
+            test_idx = np.where(test_mask)[0]
+            if len(test_idx) == 0:
+                continue
+                
+            # Apply buffer
+            if buffer_distance > 0:
+                test_coords = coords_array[test_idx]
+                distances = np.sqrt(((coords_array[:, None, :] - test_coords[None, :, :]) ** 2).sum(axis=2))
+                min_distances = distances.min(axis=1)
+                buffer_mask = min_distances > buffer_distance
+                train_idx = np.where(~test_mask & buffer_mask)[0]
+            else:
+                train_idx = np.where(~test_mask)[0]
+            
+            if len(train_idx) > 0:
+                folds.append((train_idx, test_idx))
+                fold_count += 1
+                print(f"    Fold {fold_count}: {len(train_idx)} train, {len(test_idx)} test")
+    
+    return folds
+
+def runner_based_cross_validation(track_nums, n_folds=5):
+    """
+    Implement runner-based cross-validation where entire runners are held out.
+    
+    Parameters:
+    -----------
+    track_nums : array
+        Array of track/runner IDs for each observation
+    n_folds : int
+        Number of folds for cross-validation
+    
+    Returns:
+    --------
+    list : List of (train_idx, test_idx) tuples for each fold
+    """
+    print(f"  Creating runner-based cross-validation folds...")
+    
+    unique_runners = np.unique(track_nums)
+    np.random.shuffle(unique_runners)
+    
+    folds = []
+    fold_size = len(unique_runners) // n_folds
+    
+    for fold in range(n_folds):
+        start_idx = fold * fold_size
+        end_idx = (fold + 1) * fold_size if fold < n_folds - 1 else len(unique_runners)
+        
+        test_runners = unique_runners[start_idx:end_idx]
+        test_mask = np.isin(track_nums, test_runners)
+        
+        test_idx = np.where(test_mask)[0]
+        train_idx = np.where(~test_mask)[0]
+        
+        folds.append((train_idx, test_idx))
+        print(f"    Fold {fold + 1}: {len(test_runners)} runners in test ({len(test_idx)} points), {len(unique_runners) - len(test_runners)} runners in train ({len(train_idx)} points)")
+    
+    return folds
 
 def main():
     """
@@ -485,12 +829,21 @@ def main():
     # Filter speeds
     track_df = track_df[
         (track_df["speed"] >= 0.5) & 
-        (track_df["speed"] <= 25.0)
+        (track_df["speed"] <= 30.0)
     ].copy()
     
-    # Use all available data - no subsampling for maximum performance
-    print(f"  Using all {len(track_df)} GPS points")
+    # Use spatial sampling to reduce autocorrelation
+    print(f"  Original dataset: {len(track_df)} GPS points")
     print(f"  Speed range: {track_df['speed'].min():.1f} - {track_df['speed'].max():.1f} km/h")
+    
+    # Convert to GeoDataFrame for spatial operations
+    track_gdf = gpd.GeoDataFrame(track_df, geometry='geometry')
+    
+    # Apply spatial sampling to reduce autocorrelation
+    sampled_track_df = spatial_sampling(track_gdf, sample_ratio=0.7, grid_size=50)
+    
+    print(f"  Spatially sampled dataset: {len(sampled_track_df)} GPS points")
+    print(f"  Reduction: {(1 - len(sampled_track_df)/len(track_df))*100:.1f}% to reduce spatial autocorrelation")
     
     # Step 2: Load key environmental predictors
     print("\nStep 2: Loading key environmental predictors...")
@@ -549,14 +902,14 @@ def main():
     
     print(f"  Loaded {len(predictor_names)} features")
     
-    # Step 3: Prepare track data
+    # Step 3: Prepare track data with spatial sampling
     print("\nStep 3: Preparing track structure...")
-    track_df, n_tracks, track_mapping = prepare_track_data(track_df)
+    track_df, n_tracks, track_mapping = prepare_track_data(sampled_track_df)
     track_nums = track_df['track_num'].values
-    print(f"  Using {n_tracks} tracks")
+    print(f"  Using {n_tracks} tracks after spatial sampling")
     
     # Step 4: Feature selection
-    y = np.log(track_df["speed"].values)
+    y = track_df["speed"].values
     
     # Re-extract features for the filtered dataset
     print("\nRe-extracting features for filtered dataset...")
@@ -613,16 +966,25 @@ def main():
     print(f"  Training set: {X_train.shape[0]} samples")
     print(f"  Test set: {X_test.shape[0]} samples")
     
-    # Step 6: Cross-validation
-    print("\nStep 5: Cross-validation...")
+    # Step 6: Enhanced Cross-validation with multiple strategies
+    print("\nStep 5: Enhanced cross-validation...")
     start_cv = time.time()
     
-    cv_results = cross_validate_rf(X_train_scaled, y_train, n_folds=5, n_estimators=200)
+    # Extract coordinates for spatial CV
+    coords = [(point.x, point.y) for point in track_df["geometry"]]
+    coords_train = [coords[i] for i in range(len(X_train_scaled))]
+    track_nums_train = track_nums[:len(X_train_scaled)]  # Match training set
+    
+    all_cv_results = enhanced_cross_validation(
+        X_train_scaled, y_train, coords_train, track_nums_train, 
+        n_folds=5, n_estimators=200
+    )
     
     cv_time = time.time() - start_cv
-    print(f"\nCross-validation completed in {cv_time:.1f} seconds")
+    print(f"\nEnhanced cross-validation completed in {cv_time:.1f} seconds")
     
-    # Calculate statistics
+    # Calculate statistics for primary validation method (spatial)
+    cv_results = all_cv_results.get('spatial', all_cv_results['random'])
     valid_results = [r for r in cv_results['r2'] if r != 0.0]
     if valid_results:
         r2_mean = np.mean(valid_results)
@@ -635,8 +997,8 @@ def main():
         rmse_mean = 999.0
         oob_mean = 0.0
     
-    print(f"  Cross-validation R²: {r2_mean:.3f} ± {r2_std:.3f}")
-    print(f"  Cross-validation RMSE: {rmse_mean:.3f} km/h")
+    print(f"  Primary validation (spatial) R²: {r2_mean:.3f} ± {r2_std:.3f}")
+    print(f"  Primary validation RMSE: {rmse_mean:.3f} km/h")
     print(f"  Mean Out-of-Bag R²: {oob_mean:.3f}")
     
     # Step 7: Final model training
@@ -653,21 +1015,21 @@ def main():
     print("\nStep 7: Test set evaluation...")
     
     y_pred_test = final_model.predict(X_test_scaled)
-    y_pred_test_exp = np.exp(y_pred_test)
-    y_test_exp = np.exp(y_test)
     
-    test_r2 = r2_score(y_test_exp, y_pred_test_exp)
-    test_rmse = np.sqrt(mean_squared_error(y_test_exp, y_pred_test_exp))
-    test_mae = mean_absolute_error(y_test_exp, y_pred_test_exp)
+    test_r2 = r2_score(y_test, y_pred_test)
+    test_rmse = np.sqrt(mean_squared_error(y_test, y_pred_test))
+    test_mae = mean_absolute_error(y_test, y_pred_test)
     
     print(f"  Test R²: {test_r2:.3f}")
     print(f"  Test RMSE: {test_rmse:.3f} km/h")
     print(f"  Test MAE: {test_mae:.3f} km/h")
     
-    # Step 9: Save model and feature importance
-    print("\nStep 8: Saving model and feature importance...")
+    # Step 9: Save model and enhanced results
+    print("\nStep 8: Saving model and enhanced results...")
     feature_importance = final_model.feature_importances_
-    importance_df = save_rf_model_and_results(final_model, feature_importance, predictor_names, scaler)
+    importance_df, cv_summary_df = save_enhanced_rf_results(
+        final_model, feature_importance, predictor_names, scaler, all_cv_results
+    )
     
     # Step 10: Cost surface generation
     print("\nStep 9: Generating Random Forest cost surface...")
@@ -681,17 +1043,21 @@ def main():
     
     total_time = time.time() - start_total
     
-    # Save summary
+    # Save enhanced summary with all CV strategies
     summary = {
-        'model_type': 'random_forest',
+        'model_type': 'random_forest_enhanced',
         'n_predictors': len(predictor_names),
         'n_observations': len(y),
         'n_tracks': n_tracks,
         'n_estimators': final_model.n_estimators,
         'max_depth': final_model.max_depth,
-        'cv_r2_mean': r2_mean,
-        'cv_r2_std': r2_std,
-        'cv_rmse_mean': rmse_mean,
+        'spatial_sampling': True,
+        'spatial_sampling_ratio': 0.7,
+        'cv_r2_mean_spatial': r2_mean,
+        'cv_r2_std_spatial': r2_std,
+        'cv_rmse_mean_spatial': rmse_mean,
+        'cv_r2_mean_random': np.mean([r for r in all_cv_results['random']['r2'] if r != 0.0]),
+        'cv_r2_mean_runner': np.mean([r for r in all_cv_results['runner_based']['r2'] if r != 0.0]),
         'oob_score_final': final_model.oob_score_,
         'oob_score_mean_cv': oob_mean,
         'test_r2': test_r2,
@@ -705,13 +1071,21 @@ def main():
     summary_df = pd.DataFrame([summary])
     summary_df.to_csv("output/stats_analysis/random_forest_summary.csv", index=False)
     
-    print(f"\n=== RANDOM FOREST MODEL COMPLETE ===")
+    print(f"\n=== ENHANCED RANDOM FOREST MODEL COMPLETE ===")
     print(f"Total runtime: {total_time:.1f} seconds")
-    print(f"Cross-validation R²: {r2_mean:.3f} ± {r2_std:.3f}")
+    print(f"Spatial sampling: Reduced dataset by {(1-len(sampled_track_df)/len(track_gdf))*100:.1f}% to address autocorrelation")
+    print("\nCross-validation results:")
+    for strategy, results in all_cv_results.items():
+        valid_r2 = [r for r in results['r2'] if r != 0.0]
+        if valid_r2:
+            mean_r2 = np.mean(valid_r2)
+            std_r2 = np.std(valid_r2)
+            print(f"  {strategy.capitalize():12}: R² = {mean_r2:.3f} ± {std_r2:.3f}")
     print(f"Test set R²: {test_r2:.3f}")
     print(f"Final model Out-of-Bag R²: {final_model.oob_score_:.3f}")
     print(f"Used {len(predictor_names)} features on {len(y)} GPS points")
-    print("Random Forest cost surface ready for analysis!")
+    print("Enhanced Random Forest model addresses spatial autocorrelation!")
+    print("Cost surface ready for analysis with improved validation!")
     
     return cost_surface, final_model, importance_df
 

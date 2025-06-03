@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Random Forest Model Results - Simplified Figures
+Random Forest Model Results 
 ===============================================
 
-Creates simplified versions of the showcase figures with only the requested plots:
+Creates figures for the Random Forest model results:
 1. Speed distribution analysis (no runner names)
 2. Feature importance plot only
 3. Route comparison heatmap with least cost paths (all runners, no names)
@@ -12,6 +12,7 @@ Creates simplified versions of the showcase figures with only the requested plot
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import matplotlib.patheffects as path_effects
+import matplotlib.colors as mcolors
 import seaborn as sns
 import numpy as np
 import pandas as pd
@@ -19,6 +20,7 @@ import geopandas as gpd
 import rasterio
 from rasterio.plot import show
 from pathlib import Path
+import warnings
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -111,7 +113,7 @@ def load_random_forest_data():
 
 def create_speed_distribution_plot(data):
     """
-    Create simplified speed distribution plot only
+    Create speed distribution plot only
     """
     print("Creating speed distribution plot...")
     
@@ -166,10 +168,10 @@ Max: {speeds_clean.max():.1f} km/h"""
     
     # Save figure
     paths = fig_manager.register_figure(
-        category="random_forest_simplified",
+        category="random_forest",
         subcategory="speed_analysis",
-        filename="speed_distribution_simplified",
-        description="Simplified speed distribution analysis",
+        filename="speed_distribution",
+        description="Speed distribution analysis",
         figure_type="working",
         formats=["png", "pdf"]
     )
@@ -251,10 +253,10 @@ def create_feature_importance_plot(data):
     
     # Save figure
     paths = fig_manager.register_figure(
-        category="random_forest_simplified",
+        category="random_forest",
         subcategory="model_performance",
-        filename="feature_importance_simplified",
-        description="Simplified feature importance analysis",
+        filename="feature_importance",
+        description="Feature importance analysis",
         figure_type="working",
         formats=["png", "pdf"]
     )
@@ -282,62 +284,130 @@ def create_terrain_difficulty_plot(data):
     transform = data['cost_transform']
     
     # Create terrain difficulty classification based on cost values
-    # Use percentile-based thresholds for simplified classification
+    # Use percentile-based thresholds for classification
     valid_costs = cost_surface[cost_surface > 0]  # Exclude no-data values
+    
+    # Debug: Print cost surface statistics
+    print(f"Cost surface shape: {cost_surface.shape}")
+    print(f"Valid costs count: {len(valid_costs)}")
+    print(f"Cost range: {valid_costs.min():.3f} to {valid_costs.max():.3f}")
+    print(f"Cost mean: {valid_costs.mean():.3f}, std: {valid_costs.std():.3f}")
     
     if len(valid_costs) == 0:
         print("✗ No valid cost data for terrain classification")
         return
     
-    # Define simplified thresholds based on cost distribution (3 categories only)
-    p33 = np.percentile(valid_costs, 33)
-    p67 = np.percentile(valid_costs, 67)
+    # Define thresholds based on cost distribution (20 percentile intervals + 95th percentile for impassable)
+    p20 = np.percentile(valid_costs, 20)
+    p40 = np.percentile(valid_costs, 40)
+    p60 = np.percentile(valid_costs, 60)
+    p80 = np.percentile(valid_costs, 80)
+    p95 = np.percentile(valid_costs, 95)
     
-    # Create classified terrain map with only 3 meaningful categories
-    terrain_classified = np.zeros_like(cost_surface, dtype=np.uint8)
-    terrain_classified[cost_surface <= p33] = 1  # Fast terrain (low cost)
-    terrain_classified[(cost_surface > p33) & (cost_surface <= p67)] = 2  # Medium terrain
-    terrain_classified[cost_surface > p67] = 3  # Slow terrain (high cost)
-    terrain_classified[cost_surface <= 0] = 0  # No data/impassable
+    print(f"Percentile thresholds - 20th: {p20:.3f}, 40th: {p40:.3f}, 60th: {p60:.3f}, 80th: {p80:.3f}, 95th: {p95:.3f}")
     
-    # Create custom colormap for simplified terrain difficulty
-    colors = ['#000000',  # No data - black
-              '#90EE90',  # Fast - light green
-              '#FFD700',  # Medium - gold
-              '#FF6347']  # Slow - tomato
+    # Create continuous terrain representation for smooth gradient
+    terrain_continuous = np.zeros_like(cost_surface, dtype=np.float32)
     
-    from matplotlib.colors import ListedColormap
-    terrain_cmap = ListedColormap(colors)
+    # Map cost values to continuous 0-1 range for terrain gradient (excluding impassable areas)
+    mask_terrain = (cost_surface > 0) & (cost_surface <= p95)
+    mask_impassable = cost_surface > p95
+    mask_nodata = cost_surface <= 0
     
-    # Display terrain classification
-    im = ax.imshow(terrain_classified, extent=[
+    if np.any(mask_terrain):
+        # Normalize terrain costs to 0-1 range for smooth gradient
+        terrain_costs = cost_surface[mask_terrain]
+        min_cost, max_cost = terrain_costs.min(), p95
+        terrain_continuous[mask_terrain] = (cost_surface[mask_terrain] - min_cost) / (max_cost - min_cost)
+    
+    # Handle special areas with distinct values outside 0-1 range
+    terrain_continuous[mask_impassable] = 1.1  # Impassable areas - will map to white
+    terrain_continuous[mask_nodata] = -0.1     # No data - will map to black
+    
+    print(f"Terrain continuous range: {terrain_continuous.min():.3f} to {terrain_continuous.max():.3f}")
+    print(f"Terrain pixels: {np.sum(mask_terrain):,}")
+    print(f"Impassable pixels: {np.sum(mask_impassable):,}")
+    print(f"No-data pixels: {np.sum(mask_nodata):,}")
+    
+    # Create custom colormap with smooth gradient for terrain (0-1) and distinct colors for special areas
+    from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+    import matplotlib.colors as mcolors
+    
+    # Create smooth gradient for terrain difficulty (0-1 range)
+    terrain_colors = [
+        '#00FF00',  # Very fast - bright green (0.0)
+        '#90EE90',  # Fast - light green (0.25)
+        '#FFD700',  # Medium - gold (0.5)
+        '#FF4500',  # Slow - red-orange (0.75)
+        '#8B0000'   # Very slow - dark red (1.0)
+    ]
+    
+    # Create the main terrain gradient colormap (for 0-1 range)
+    terrain_gradient_cmap = LinearSegmentedColormap.from_list(
+        'terrain_gradient', terrain_colors, N=256
+    )
+    
+    # Create extended colormap to handle the full range including special values
+    # Range will be approximately -0.1 to 1.1, so we need to map:
+    # -0.1 to 0.0: black (no data)
+    # 0.0 to 1.0: terrain gradient  
+    # 1.0 to 1.1: white (impassable)
+    
+    extended_colors = []
+    
+    # Black for no-data (values < 0)
+    extended_colors.append((0.0, 0.0, 0.0, 1.0))  # Black
+    
+    # Terrain gradient (values 0-1)
+    n_terrain_colors = 200
+    for i in range(n_terrain_colors):
+        extended_colors.append(terrain_gradient_cmap(i / (n_terrain_colors - 1)))
+    
+    # White for impassable (values > 1)
+    extended_colors.append((1.0, 1.0, 1.0, 1.0))  # White
+    
+    final_cmap = ListedColormap(extended_colors)
+    
+    print(f"Created gradient colormap with {len(extended_colors)} colors")
+    print(f"Terrain uses smooth gradient from green to dark red")
+    print(f"Impassable areas use distinct white color")
+    
+    # Also create discrete classification for statistics
+    terrain_classified = np.zeros_like(cost_surface, dtype=int)
+    terrain_classified[mask_terrain] = 1  # Start with all terrain as category 1
+    terrain_classified[(cost_surface > p20) & (cost_surface <= p40)] = 2  # Fast
+    terrain_classified[(cost_surface > p40) & (cost_surface <= p60)] = 3  # Medium  
+    terrain_classified[(cost_surface > p60) & (cost_surface <= p80)] = 4  # Slow
+    terrain_classified[(cost_surface > p80) & (cost_surface <= p95)] = 5  # Very Slow
+    terrain_classified[mask_impassable] = 6  # Impassable
+    # Leave no-data as 0
+    
+    # Display terrain with gradient and set bounds to focus on meaningful data range
+    im = ax.imshow(terrain_continuous, extent=[
         data['cost_bounds'].left, data['cost_bounds'].right,
         data['cost_bounds'].bottom, data['cost_bounds'].top
-    ], cmap=terrain_cmap, alpha=0.8, aspect='auto')
+    ], cmap=final_cmap, alpha=0.9, aspect='auto', vmin=0, vmax=1)
     
-    # Add impassable areas as very dark red if available
-    impassable_mask = cost_surface <= 0
-    if np.any(impassable_mask):
-        impassable_display = np.zeros_like(cost_surface)
-        impassable_display[impassable_mask] = 1
-        ax.imshow(impassable_display, extent=[
-            data['cost_bounds'].left, data['cost_bounds'].right,
-            data['cost_bounds'].bottom, data['cost_bounds'].top
-        ], cmap=ListedColormap(['#00000000', '#8B0000']), alpha=0.9, aspect='auto')
-    
-    # Add colorbar with custom labels
+    # Add colorbar for gradient visualization
     cbar = plt.colorbar(im, ax=ax, shrink=0.8, pad=0.02)
-    cbar.set_ticks([0.5, 1.5, 2.5, 3.5])
-    cbar.set_ticklabels(['No Data', 'Fast Terrain\n(Low Cost)', 
-                        'Medium Terrain', 'Slow Terrain\n(High Cost)'])
-    cbar.set_label('Terrain Difficulty Classification', fontsize=12, fontweight='bold')
+    
+    # Create custom tick positions and labels for the gradient
+    cbar.set_ticks([0.1, 0.3, 0.5, 0.7, 0.9])
+    cbar.set_ticklabels(['Very Fast\n(0-20%)', 'Fast\n(20-40%)', 
+                        'Medium\n(40-60%)', 'Slow\n(60-80%)', 'Very Slow\n(80-95%)'])
+    cbar.set_label('Terrain Difficulty (Gradient)', fontsize=12, fontweight='bold')
+    
+    # Add note about impassable areas
+    cbar.ax.text(1.15, 1.02, 'Impassable (95%+)\nshown in white', 
+                transform=cbar.ax.transAxes, fontsize=9, 
+                va='bottom', ha='left', style='italic')
     
     # Overlay optimal paths with thick, visible lines
     if data['optimal_paths'] is not None:
         # Black outline for visibility
-        data['optimal_paths'].plot(ax=ax, color='black', linewidth=8, alpha=0.9, zorder=9)
+        data['optimal_paths'].plot(ax=ax, color='black', linewidth=4, alpha=0.9, zorder=9)
         # Bright cyan main line
-        data['optimal_paths'].plot(ax=ax, color='cyan', linewidth=6, alpha=1.0, 
+        data['optimal_paths'].plot(ax=ax, color='cyan', linewidth=3, alpha=1.0, 
                                   label='Optimal Least-Cost Path', zorder=10)
     
     # Overlay control points with better visibility for numbers
@@ -357,12 +427,12 @@ def create_terrain_difficulty_plot(data):
                                ha='left', va='top', zorder=20,
                                path_effects=[path_effects.withStroke(linewidth=1, foreground='black')])
     
-    ax.set_title('Terrain Difficulty Classification with Optimal Least-Cost Path', 
+    ax.set_title('Terrain Difficulty Gradient with Optimal Least-Cost Path', 
                  fontsize=18, fontweight='bold', pad=20)
     ax.set_xlabel('Easting (m)', fontsize=14)
     ax.set_ylabel('Northing (m)', fontsize=14)
     
-    # Create legend
+    # Create legend 
     legend_elements = []
     if data['optimal_paths'] is not None:
         legend_elements.append(plt.Line2D([0], [0], color='cyan', linewidth=4, 
@@ -379,19 +449,26 @@ def create_terrain_difficulty_plot(data):
     
     ax.grid(True, alpha=0.3)
     
-    # Add classification statistics
+    # Add gradient statistics (based on discrete categories for percentages)
     total_pixels = np.sum(terrain_classified > 0)
     if total_pixels > 0:
-        stats_text = f"""Classification Statistics:
-Fast Terrain: {np.sum(terrain_classified == 1)/total_pixels*100:.1f}%
-Medium Terrain: {np.sum(terrain_classified == 2)/total_pixels*100:.1f}%
-Slow Terrain: {np.sum(terrain_classified == 3)/total_pixels*100:.1f}%
+        stats_text = f"""Gradient Statistics:
+Very Fast: {np.sum(terrain_classified == 1)/total_pixels*100:.1f}%
+Fast: {np.sum(terrain_classified == 2)/total_pixels*100:.1f}%
+Medium: {np.sum(terrain_classified == 3)/total_pixels*100:.1f}%
+Slow: {np.sum(terrain_classified == 4)/total_pixels*100:.1f}%
+Very Slow: {np.sum(terrain_classified == 5)/total_pixels*100:.1f}%
+Impassable: {np.sum(terrain_classified == 6)/total_pixels*100:.1f}%
 
 Cost Thresholds:
-Fast: ≤{p33:.1f}
-Medium: {p33:.1f}-{p67:.1f}
-Slow: >{p67:.1f}"""
-        
+Very Fast: ≤{p20:.3f}
+Fast: {p20:.3f}-{p40:.3f}
+Medium: {p40:.3f}-{p60:.3f}
+Slow: {p60:.3f}-{p80:.3f}
+Very Slow: {p80:.3f}-{p95:.3f}
+Impassable: >{p95:.3f}
+"""
+         
         ax.text(0.02, 0.98, stats_text, transform=ax.transAxes, 
                 fontsize=10, va='top', ha='left',
                 bbox=dict(boxstyle='round,pad=0.5', facecolor='white', alpha=0.9))
@@ -400,9 +477,9 @@ Slow: >{p67:.1f}"""
     
     # Save figure
     paths = fig_manager.register_figure(
-        category="random_forest_simplified",
+        category="random_forest",
         subcategory="terrain_analysis",
-        filename="terrain_difficulty_simplified",
+        filename="terrain_difficulty",
         description="Terrain difficulty classification with optimal paths",
         figure_type="working",
         formats=["png", "pdf"]
@@ -549,10 +626,10 @@ Optimal Path Length: {optimal_length:.0f}m"""
     
     # Save figure
     paths = fig_manager.register_figure(
-        category="random_forest_simplified",
+        category="random_forest",
         subcategory="route_comparison",
-        filename="route_heatmap_simplified",
-        description="Strava-style speed visualization with optimal paths",
+        filename="route_heatmap",
+        description="Speed visualization with optimal paths",
         figure_type="working",
         formats=["png", "pdf"]
     )
@@ -561,19 +638,19 @@ Optimal Path Length: {optimal_length:.0f}m"""
     plt.savefig(paths['pdf'], dpi=300, bbox_inches='tight')
     plt.close()
     
-    print(f"✓ Saved Strava-style speed plot to: {paths['png']}")
+    print(f"✓ Saved speed plot to: {paths['png']}")
 
 def main():
-    """Generate simplified Random Forest showcase figures."""
-    print("=== RANDOM FOREST SIMPLIFIED FIGURES ===")
-    print("Generating simplified versions of Random Forest results...")
+    """Generate Random Forest showcase figures."""
+    print("=== RANDOM FOREST FIGURES ===")
+    print("Generating versions of Random Forest results...")
     
     # Load all data
     data = load_random_forest_data()
-    
-    # Generate simplified plots
-    print("\nGenerating simplified plots...")
-    
+
+    # Generate plots
+    print("\nGenerating plots...")
+
     try:
         create_terrain_difficulty_plot(data)
     except Exception as e:
@@ -593,10 +670,10 @@ def main():
         create_route_heatmap_plot(data)
     except Exception as e:
         print(f"✗ Error creating route heatmap plot: {e}")
-    
-    print("\n=== SIMPLIFIED FIGURES COMPLETE ===")
-    print("All simplified Random Forest figures have been generated!")
-    print("Check the output/figures/random_forest_simplified/ directory for results.")
+
+    print("\n=== RANDOM FOREST FIGURES COMPLETE ===")
+    print("All Random Forest figures have been generated!")
+    print("Check the output/figures/random_forest/ directory for results.")
 
 if __name__ == "__main__":
     main()

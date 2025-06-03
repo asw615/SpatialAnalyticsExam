@@ -6,7 +6,10 @@ venv/
 .env
 
 # Ignore data and output files (but not src/data/)
-/data/
+data/raw/map/
+data/raw/gps/
+data/derived/map/
+data/derived/gps/
 # ignore cache files
 cache/
 # Ignore OS and editor files
@@ -16,4 +19,3 @@ cache/
 output/model_trace/random_forest_model.pkl
 # Ignore Jupyter Notebook checkpoints
 .ipynb_checkpoints/
-output/cost_surfaces/*.tif

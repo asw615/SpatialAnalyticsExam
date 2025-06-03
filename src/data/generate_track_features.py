@@ -225,14 +225,14 @@ def main():
     # Combine all dataframes
     print("\nCombining all track data...")
     combined_df = pd.concat(all_dataframes, ignore_index=True)
-    
-    # Apply speed filtering as expected by the model (0.5-25.0 km/h)
+
+    # Apply speed filtering as expected by the model (0.5-30.0 km/h)
     print(f"Total points before speed filtering: {len(combined_df)}")
     
     # Filter speeds
     filtered_df = combined_df[
         (combined_df["speed"] >= 0.5) & 
-        (combined_df["speed"] <= 25.0)
+        (combined_df["speed"] <= 30.0)
     ].copy()
     
     print(f"Total points after speed filtering: {len(filtered_df)}")
