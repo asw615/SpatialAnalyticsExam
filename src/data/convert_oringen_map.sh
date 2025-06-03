@@ -10,6 +10,7 @@ UNZIP_DIR="data/raw/map/oringen_kmz"
 PNG_PATH="$UNZIP_DIR/files/map.png"
 TEMP_TIF="data/raw/map/temp.tif"
 TEMP1_TIF="data/raw/map/oringen_e4_2024_h21elit.tif"
+TEMP2_TIF="data/raw/map/temp_gcps.tif"
 FINAL_TIF="data/raw/map/oringen_e4_2024_h21elit_REFERENCED.tif"
 
 # 1. Unzip KMZ (if not already unzipped)
@@ -68,6 +69,7 @@ gdal_translate -of GTiff \
 gdalwarp -r near -tps -co COMPRESS=NONE -t_srs EPSG:3006 "$TEMP_TIF" "$TEMP1_TIF"
 
 gdal_translate -of GTiff \
+  -a_srs EPSG:3006 \
   -gcp 3743.2 1906.16 588141.177 6349651.368 \
   -gcp 4716.913 923.964 588940.333 6350302.028 \
   -gcp 2514.648 2825.987 587156.175 6349102.879 \
@@ -83,7 +85,11 @@ gdal_translate -of GTiff \
   -gcp 3243.024 2277.738 587746.707 6349428.371 \
   -gcp 3745.266 1359.296 588168.692 6350108.238 \
   -gcp 4598.308 1746.317 588827.651 6349670.738 \
-  "$TEMP1_TIF" "$FINAL_TIF"
-rm "$TEMP_TIF" "$TEMP1_TIF"
+  "$TEMP1_TIF" "$TEMP2_TIF"
+
+# Convert GCPs to geotransform for proper georeferencing
+python src/data/convert_gcps_to_geotransform.py "$TEMP2_TIF" "$FINAL_TIF"
+rm "$TEMP_TIF" "$TEMP1_TIF" "$TEMP2_TIF"  # Keep temp files for debugging
+  
 
 echo "Done! Output: $FINAL_TIF"

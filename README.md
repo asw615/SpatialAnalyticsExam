@@ -101,6 +101,14 @@ SpatialAnalyticsExam/
 ### Installation and Setup
 
 1. **Clone the repository**
+Make sure git lfs is installed. 
+
+On mac:
+```bash
+brew install git-lfs
+git lfs install
+```
+
 ```bash
 git clone https://github.com/asw615/SpatialAnalyticsExam.git
 cd SpatialAnalyticsExam
@@ -112,10 +120,10 @@ bash setup.sh
 ```
 
 ### Running the Analysis
-After having cloned the GitHub Repository, downloaded GPS data, georeferenced the map, the full pipeline can be run by skipping the first two download and convert steps:
+After having cloned the GitHub Repository, the full pipeline can be run by skipping the first download DEM step:
 
 ```bash
-python src/main_workflow.py --skip-dem --skip-map
+bash run.sh
 ```
 
 ## Procedure/Methods
